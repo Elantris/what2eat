@@ -79,10 +79,10 @@ client.on('message', async message => {
 
   if (guildStatus[guildId]) {
     if (guildStatus[guildId] === 'processing') {
-      message.channel.send('指令處理中')
+      message.channel.send(':star2: 指令處理中')
       guildStatus[guildId] = 'muted'
     } else if (guildStatus[guildId] === 'cooling-down') {
-      message.channel.send('指令冷卻中')
+      message.channel.send(':ice_cube: 指令冷卻中')
       guildStatus[guildId] = 'muted'
     }
     return
@@ -90,7 +90,7 @@ client.on('message', async message => {
 
   const prefix = cache.settings[guildId]?.prefix || 'w!,吃什麼'
   if (/<@!{0,1}689455354664321064>/.test(message.content)) {
-    message.channel.send(`\`${guildId}\` 指令前綴: ${prefix}`)
+    message.channel.send(`:page_facing_up: \`${guildId}\` 指令前綴：${prefix}`)
     return
   }
   const args = message.content.replace(/\s+/g, ' ').split(' ')
@@ -103,7 +103,7 @@ client.on('message', async message => {
     const result = await handleCommand(guildId, args)
     result && message.channel.send(result)
   } catch (error) {
-    message.channel.send('指令運行錯誤')
+    message.channel.send(':fire: 指令運行錯誤')
     loggerHook.send(`[\`${moment().format('HH:mm:ss')}\`] \`${guildId}\`: ${message.content}\n\`\`\`${error}\`\`\``)
   }
 
@@ -124,7 +124,7 @@ const handleCommand: (guildId: string, args: string[]) => Promise<string | null>
     case 'prefix':
       const newPrefix = args.slice(2).join(',')
       database.ref(`/settings/${guildId}/prefix`).set(newPrefix)
-      return `\`${guildId}\` 指令前綴：${newPrefix}`
+      return `:page_facing_up: \`${guildId}\` 指令前綴：${newPrefix}`
   }
 
   return null
