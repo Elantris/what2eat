@@ -1,0 +1,19 @@
+// ! cSpell: disable
+
+const config = {
+  DISCORD: {
+    TOKEN: '',
+    LOGGER_HOOK: ['', ''],
+  },
+  FIREBASE: {
+    apiKey: '',
+    authDomain: '<PROJECT-ID>.firebaseapp.com',
+    databaseURL: 'https://<PROJECT-ID>.firebaseio.com',
+    projectId: '<PROJECT-ID>',
+    storageBucket: '<PROJECT-ID>.appspot.com',
+    messagingSenderId: '',
+    appId: '',
+  },
+}
+
+export default config
