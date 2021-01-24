@@ -1,4 +1,4 @@
-import { Client, WebhookClient } from 'discord.js'
+import { Client, Message, WebhookClient } from 'discord.js'
 import firebase from 'firebase'
 import moment from 'moment'
 import config from './config'
@@ -72,17 +72,17 @@ const loggerHook = new WebhookClient(...(config.DISCORD.LOGGER_HOOK as [string, 
 const guildStatus: { [GuildID: string]: 'processing' | 'cooling-down' | 'muted' } = {}
 
 client.on('message', async message => {
-  if (message.author.bot || !message.guild || cache.bannedUsers[message.author.id]) {
+  if (message.author.bot || !message.guild || !message.member || cache.bannedUsers[message.author.id]) {
     return
   }
   const guildId = message.guild.id
 
   if (guildStatus[guildId]) {
     if (guildStatus[guildId] === 'processing') {
-      message.channel.send(':star2: 指令處理中')
+      message.channel.send(':star2: MEMBER_NAME 指令處理中'.replace('MEMBER_NAME', message.member.displayName))
       guildStatus[guildId] = 'muted'
     } else if (guildStatus[guildId] === 'cooling-down') {
-      message.channel.send(':ice_cube: 指令冷卻中')
+      message.channel.send(':ice_cube: MEMBER_NAME 指令冷卻中'.replace('MEMBER_NAME', message.member.displayName))
       guildStatus[guildId] = 'muted'
     }
     return
@@ -100,7 +100,7 @@ client.on('message', async message => {
 
   try {
     guildStatus[guildId] = 'processing'
-    const result = await handleCommand(guildId, args)
+    const result = await handleCommand(message, guildId, args)
     result && message.channel.send(result)
   } catch (error) {
     message.channel.send(':fire: 指令運行錯誤')
@@ -114,10 +114,14 @@ client.on('message', async message => {
   }, 3000)
 })
 
-const handleCommand: (guildId: string, args: string[]) => Promise<string | null> = async (guildId, args) => {
+const handleCommand: (message: Message, guildId: string, args: string[]) => Promise<string | null> = async (
+  message,
+  guildId,
+  args,
+) => {
   if (args.length === 1) {
     const item = getRandomItem()
-    return `:fork_knife_plate: ${item.name}`
+    return `:fork_knife_plate: ${message.member?.displayName} ${item.name}`
   }
 
   switch (args[1]) {
