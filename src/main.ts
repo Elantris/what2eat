@@ -77,6 +77,16 @@ client.on('message', async message => {
   }
   const guildId = message.guild.id
 
+  const prefix = cache.settings[guildId]?.prefix || 'w!,吃什麼'
+  if (/<@!{0,1}689455354664321064>/.test(message.content)) {
+    message.channel.send(`:page_facing_up: \`${guildId}\` 指令前綴：${prefix}`)
+    return
+  }
+  const args = message.content.replace(/\s+/g, ' ').split(' ')
+  if (!prefix.split(',').includes(args[0])) {
+    return
+  }
+
   if (guildStatus[guildId]) {
     if (guildStatus[guildId] === 'processing') {
       message.channel.send(':star2: MEMBER_NAME 指令處理中'.replace('MEMBER_NAME', message.member.displayName))
@@ -85,16 +95,6 @@ client.on('message', async message => {
       message.channel.send(':ice_cube: MEMBER_NAME 指令冷卻中'.replace('MEMBER_NAME', message.member.displayName))
       guildStatus[guildId] = 'muted'
     }
-    return
-  }
-
-  const prefix = cache.settings[guildId]?.prefix || 'w!,吃什麼'
-  if (/<@!{0,1}689455354664321064>/.test(message.content)) {
-    message.channel.send(`:page_facing_up: \`${guildId}\` 指令前綴：${prefix}`)
-    return
-  }
-  const args = message.content.replace(/\s+/g, ' ').split(' ')
-  if (!prefix.split(',').includes(args[0])) {
     return
   }
 
@@ -121,7 +121,7 @@ const handleCommand: (message: Message, guildId: string, args: string[]) => Prom
 ) => {
   if (args.length === 1) {
     const item = getRandomItem()
-    return `:fork_knife_plate: ${message.member?.displayName} ${item.name}`
+    return `:fork_knife_plate: ${message.member?.displayName}：${item.name}`
   }
 
   switch (args[1]) {
