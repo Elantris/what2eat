@@ -8,51 +8,47 @@ import foodPandaItems from './items.json'
 firebase.initializeApp(config.FIREBASE)
 const database = firebase.database()
 
-const cache: {
-  bannedUsers: {
-    [DiscordID: string]: number
-  }
+type CacheProps = {
   items: {
-    [ItemID: string]: {
-      names: string
-      tags: string
+    [ItemName: string]: {
+      authorId: string
+      createdAt: number
     }
   }
   settings: {
-    [GuildId: string]: {
+    [GuildID: string]: {
       prefix: string
     }
   }
-} = {
-  bannedUsers: {},
+}
+const cache: CacheProps = {
   items: {},
   settings: {},
 }
+
+let items: string[] = Object.keys(foodPandaItems)
 
 const updateCache = (snapshot: firebase.database.DataSnapshot) => {
   const key = snapshot.ref.parent?.key as keyof typeof cache | null | undefined
   if (key && snapshot.key) {
     cache[key][snapshot.key] = snapshot.val()
+    items = [...Object.keys(foodPandaItems), ...Object.keys(cache.items)]
   }
 }
 const removeCache = (snapshot: firebase.database.DataSnapshot) => {
   const key = snapshot.ref.parent?.key as keyof typeof cache | null | undefined
   if (key && snapshot.key) {
     delete cache[key][snapshot.key]
+    items = [...Object.keys(foodPandaItems), ...Object.keys(cache.items)]
   }
 }
 
-database.ref('/bannedUsers').on('child_added', updateCache)
-database.ref('/bannedUsers').on('child_changed', updateCache)
-database.ref('/bannedUsers').on('child_removed', removeCache)
 database.ref('/items').on('child_added', updateCache)
 database.ref('/items').on('child_changed', updateCache)
 database.ref('/items').on('child_removed', removeCache)
 database.ref('/settings').on('child_added', updateCache)
 database.ref('/settings').on('child_changed', updateCache)
 database.ref('/settings').on('child_removed', removeCache)
-
-const items: string[] = [...Object.keys(foodPandaItems), ...Object.keys(cache.items)]
 
 const getRandomItem: () => {
   index: number
@@ -72,11 +68,11 @@ const loggerHook = new WebhookClient(...(config.DISCORD.LOGGER_HOOK as [string, 
 const guildStatus: { [GuildID: string]: 'processing' | 'cooling-down' | 'muted' } = {}
 
 client.on('message', async message => {
-  if (message.author.bot || !message.guild || !message.member || cache.bannedUsers[message.author.id]) {
+  if (message.author.bot || !message.guild || !message.member) {
     return
   }
-  const guildId = message.guild.id
 
+  const guildId = message.guild.id
   const prefix = cache.settings[guildId]?.prefix || 'w!,吃什麼'
   if (/<@!{0,1}689455354664321064>/.test(message.content)) {
     message.channel.send(`:page_facing_up: \`${guildId}\` 指令前綴：${prefix}`)
@@ -104,17 +100,22 @@ client.on('message', async message => {
     result && message.channel.send(result)
   } catch (error) {
     message.channel.send(':fire: 指令運行錯誤')
-    loggerHook.send(`[\`${moment().format('HH:mm:ss')}\`] \`${guildId}\`: ${message.content}\n\`\`\`${error}\`\`\``)
+    loggerHook.send(
+      '[`TIME`] `GUILD_ID`: CONTENT\n```ERROR```'
+        .replace('TIME', moment(message.createdTimestamp).format('HH:mm:ss'))
+        .replace('GUILD_ID', guildId)
+        .replace('CONTENT', message.content)
+        .replace('ERROR', error),
+    )
   }
 
   guildStatus[guildId] = 'cooling-down'
-
   setTimeout(() => {
     delete guildStatus[guildId]
-  }, 3000)
+  }, 1000)
 })
 
-const handleCommand: (message: Message, guildId: string, args: string[]) => Promise<string | null> = async (
+const handleCommand: (message: Message, guildId: string, args: string[]) => Promise<string> = async (
   message,
   guildId,
   args,
@@ -129,13 +130,31 @@ const handleCommand: (message: Message, guildId: string, args: string[]) => Prom
       const newPrefix = args.slice(2).join(',')
       database.ref(`/settings/${guildId}/prefix`).set(newPrefix)
       return `:page_facing_up: \`${guildId}\` 指令前綴：${newPrefix}`
+    case 'add':
+      const newItems = args.slice(2).filter(arg => !items.includes(arg))
+      if (newItems.length === 0) {
+        return ':x: 這些品項已經有了'
+      }
+
+      const updates: CacheProps['items'] = {}
+      newItems.forEach(newItem => {
+        updates[newItem] = {
+          authorId: message.author.id,
+          createdAt: message.createdTimestamp,
+        }
+      })
+      await database.ref(`/items`).update(updates)
+
+      return ':white_check_mark: 成功新增 COUNT 個品項：ITEMS'
+        .replace('COUNT', `${newItems.length}`)
+        .replace('ITEMS', newItems.join('、'))
   }
 
-  return null
+  return ''
 }
 
 client.on('ready', () => {
-  console.log(`Logged in as ${client.user?.tag}`)
+  loggerHook.send(`Logged in as ${client.user?.tag}`)
 })
 
 client.login(config.DISCORD.TOKEN)
