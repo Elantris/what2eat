@@ -72,10 +72,11 @@ client.on('message', async message => {
     return
   }
 
+  // detect prefix triggers and parse arguments from message content
   const guildId = message.guild.id
   const prefix = cache.settings[guildId]?.prefix || 'w!,吃什麼'
   if (/<@!{0,1}689455354664321064>/.test(message.content)) {
-    message.channel.send(`:page_facing_up: \`${guildId}\` 指令前綴：${prefix}`)
+    message.channel.send(`:page_facing_up: 目前機器人指令觸發前綴：${prefix}`)
     return
   }
   const args = message.content.replace(/\s+/g, ' ').split(' ')
@@ -94,10 +95,11 @@ client.on('message', async message => {
     return
   }
 
+  // handle command
   try {
     guildStatus[guildId] = 'processing'
-    const result = await handleCommand(message, guildId, args)
-    result && message.channel.send(result)
+    const responseContent = await handleCommand(message, guildId, args)
+    responseContent && (await sendResponse(message, responseContent))
   } catch (error) {
     message.channel.send(':fire: 指令運行錯誤')
     loggerHook.send(
@@ -129,7 +131,8 @@ const handleCommand: (message: Message, guildId: string, args: string[]) => Prom
     case 'prefix':
       const newPrefix = args.slice(2).join(',')
       database.ref(`/settings/${guildId}/prefix`).set(newPrefix)
-      return `:page_facing_up: \`${guildId}\` 指令前綴：${newPrefix}`
+      return `:page_facing_up: 指令觸發前綴改為：${newPrefix}`
+
     case 'add':
       const newItems = args.slice(2).filter(arg => !items.includes(arg))
       if (newItems.length === 0) {
@@ -153,8 +156,24 @@ const handleCommand: (message: Message, guildId: string, args: string[]) => Prom
   return ''
 }
 
+const sendResponse = async (message: Message, responseContent: string) => {
+  const responseMessage = await message.channel.send(responseContent)
+  loggerHook.send(
+    '[`TIME`] `GUILD_ID`: MESSAGE_CONTENT\n(**PROCESSING_TIME**ms) RESPONSE_CONTENT'
+      .replace('TIME', moment(message.createdTimestamp).format('HH:mm:ss'))
+      .replace('GUILD_ID', message.guild?.id || '')
+      .replace('MESSAGE_CONTENT', message.content)
+      .replace('PROCESSING_TIME', `${responseMessage.createdTimestamp - message.createdTimestamp}`)
+      .replace('RESPONSE_CONTENT', responseContent),
+  )
+}
+
 client.on('ready', () => {
-  loggerHook.send(`Logged in as ${client.user?.tag}`)
+  loggerHook.send(
+    '[`TIME`] USER_TAG is alive!'
+      .replace('TIME', moment().format('HH:mm:ss'))
+      .replace('USER_TAG', client.user?.tag || ''),
+  )
 })
 
 client.login(config.DISCORD.TOKEN)

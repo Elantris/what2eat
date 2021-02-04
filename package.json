@@ -5,8 +5,8 @@
   "main": "index.js",
   "scripts": {
     "start": "npm run build && node build/main.js",
-    "pm2": "pm2 start build/main.js --name what2eat && pm2 monit",
     "build": "rm -rf ./build/* && ./node_modules/.bin/tsc",
+    "pm2": "pm2 start build/main.js --name what2eat && pm2 monit",
     "restart": "pm2 stop what2eat && pm2 reset what2eat && pm2 start what2eat && pm2 monit"
   },
   "keywords": [],
@@ -21,7 +21,7 @@
   },
   "devDependencies": {
     "@types/moment": "^2.13.0",
-    "@types/node": "^14.14.22",
+    "@types/node": "^14.14.25",
     "@types/node-fetch": "^2.5.8",
     "@types/ramda": "^0.27.36",
     "@types/ws": "^7.4.0",
