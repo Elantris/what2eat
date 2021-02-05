@@ -1,12 +1,15 @@
 import { Client, Message, WebhookClient } from 'discord.js'
-import firebase from 'firebase'
+import admin, { ServiceAccount } from 'firebase-admin'
 import moment from 'moment'
 import config from './config'
 import foodPandaItems from './items.json'
 
 // firebase
-firebase.initializeApp(config.FIREBASE)
-const database = firebase.database()
+admin.initializeApp({
+  credential: admin.credential.cert(config.FIREBASE.serviceAccount as ServiceAccount),
+  databaseURL: config.FIREBASE.databaseURL,
+})
+const database = admin.database()
 
 type CacheProps = {
   items: {
@@ -28,14 +31,14 @@ const cache: CacheProps = {
 
 let items: string[] = Object.keys(foodPandaItems)
 
-const updateCache = (snapshot: firebase.database.DataSnapshot) => {
+const updateCache = (snapshot: admin.database.DataSnapshot) => {
   const key = snapshot.ref.parent?.key as keyof typeof cache | null | undefined
   if (key && snapshot.key) {
     cache[key][snapshot.key] = snapshot.val()
     items = [...Object.keys(foodPandaItems), ...Object.keys(cache.items)]
   }
 }
-const removeCache = (snapshot: firebase.database.DataSnapshot) => {
+const removeCache = (snapshot: admin.database.DataSnapshot) => {
   const key = snapshot.ref.parent?.key as keyof typeof cache | null | undefined
   if (key && snapshot.key) {
     delete cache[key][snapshot.key]
@@ -75,7 +78,8 @@ client.on('message', async message => {
   // detect prefix triggers and parse arguments from message content
   const guildId = message.guild.id
   const prefix = cache.settings[guildId]?.prefix || 'w!,吃什麼'
-  if (/<@!{0,1}689455354664321064>/.test(message.content)) {
+  const isMentionedRule = new RegExp(`<@!{0,1}${client.user?.id}>`)
+  if (isMentionedRule.test(message.content)) {
     message.channel.send(`:page_facing_up: 目前機器人指令觸發前綴：${prefix}`)
     return
   }
@@ -148,7 +152,8 @@ const handleCommand: (message: Message, guildId: string, args: string[]) => Prom
       })
       await database.ref(`/items`).update(updates)
 
-      return ':white_check_mark: 成功新增 COUNT 個品項：ITEMS'
+      return ':white_check_mark: MEMBER_NAME 成功新增 COUNT 個品項：ITEMS'
+        .replace('MEMBER_NAME', message.member?.displayName || '')
         .replace('COUNT', `${newItems.length}`)
         .replace('ITEMS', newItems.join('、'))
   }
@@ -168,11 +173,14 @@ const sendResponse = async (message: Message, responseContent: string) => {
   )
 }
 
+const startedAt = Date.now()
 client.on('ready', () => {
+  const readyAt = Date.now()
   loggerHook.send(
-    '[`TIME`] USER_TAG is alive!'
+    '[`TIME`] USER_TAG is alive! (**PROCESSING_TIME**ms)'
       .replace('TIME', moment().format('HH:mm:ss'))
-      .replace('USER_TAG', client.user?.tag || ''),
+      .replace('USER_TAG', client.user?.tag || '')
+      .replace('PROCESSING_TIME', `${readyAt - startedAt}`),
   )
 })
 
