@@ -12,6 +12,7 @@ admin.initializeApp({
 const database = admin.database()
 
 type CacheProps = {
+  [key: string]: any
   items: {
     [ItemName: string]: {
       authorId: string
@@ -20,7 +21,8 @@ type CacheProps = {
   }
   settings: {
     [GuildID: string]: {
-      prefix: string
+      prefix?: string
+      triggers?: string
     }
   }
 }
@@ -32,15 +34,15 @@ const cache: CacheProps = {
 let items: string[] = Object.keys(foodPandaItems)
 
 const updateCache = (snapshot: admin.database.DataSnapshot) => {
-  const key = snapshot.ref.parent?.key as keyof typeof cache | null | undefined
-  if (key && snapshot.key) {
+  const key = snapshot.ref.parent?.key
+  if (key && cache[key] && snapshot.key) {
     cache[key][snapshot.key] = snapshot.val()
     items = [...Object.keys(foodPandaItems), ...Object.keys(cache.items)]
   }
 }
 const removeCache = (snapshot: admin.database.DataSnapshot) => {
-  const key = snapshot.ref.parent?.key as keyof typeof cache | null | undefined
-  if (key && snapshot.key) {
+  const key = snapshot.ref.parent?.key
+  if (key && cache[key] && snapshot.key) {
     delete cache[key][snapshot.key]
     items = [...Object.keys(foodPandaItems), ...Object.keys(cache.items)]
   }
@@ -77,14 +79,20 @@ client.on('message', async message => {
 
   // detect prefix triggers and parse arguments from message content
   const guildId = message.guild.id
-  const prefix = cache.settings[guildId]?.prefix || 'w!,吃什麼'
-  const isMentionedRule = new RegExp(`<@!{0,1}${client.user?.id}>`)
-  if (isMentionedRule.test(message.content)) {
-    message.channel.send(`:page_facing_up: 目前機器人指令觸發前綴：${prefix}`)
+  const prefix = cache.settings[guildId]?.prefix || 'w!'
+  const triggers = (cache.settings[guildId]?.triggers || '吃什麼').split(' ')
+  if (new RegExp(`<@!{0,1}${client.user?.id}>`).test(message.content)) {
+    message.channel.send(`:gear: 伺服器設定\n指令前綴：${prefix}\n抽選餐點：${triggers.join(' ')}`)
     return
   }
+
   const args = message.content.replace(/\s+/g, ' ').split(' ')
-  if (!prefix.split(',').includes(args[0])) {
+  const messageType = message.content.startsWith(prefix)
+    ? 'command'
+    : triggers.some(trigger => message.content === trigger)
+    ? 'item'
+    : null
+  if (!messageType) {
     return
   }
 
@@ -102,10 +110,19 @@ client.on('message', async message => {
   // handle command
   try {
     guildStatus[guildId] = 'processing'
-    const responseContent = await handleCommand(message, guildId, args)
-    responseContent && (await sendResponse(message, responseContent))
+    if (messageType === 'item') {
+      const item = getRandomItem()
+      await sendResponse(message, `:fork_knife_plate: ${message.member.displayName}：${item.name}`)
+    } else {
+      const responseContent = await handleCommand(message, guildId, args)
+      if (!responseContent) {
+        delete guildStatus[guildId]
+        return
+      }
+      await sendResponse(message, responseContent)
+    }
   } catch (error) {
-    message.channel.send(':fire: 指令運行錯誤')
+    sendResponse(message, ':fire: 指令運行錯誤')
     loggerHook.send(
       '[`TIME`] `GUILD_ID`: CONTENT\n```ERROR```'
         .replace('TIME', moment(message.createdTimestamp).format('HH:mm:ss'))
@@ -126,19 +143,28 @@ const handleCommand: (message: Message, guildId: string, args: string[]) => Prom
   guildId,
   args,
 ) => {
-  if (args.length === 1) {
-    const item = getRandomItem()
-    return `:fork_knife_plate: ${message.member?.displayName}：${item.name}`
-  }
+  const prefix = cache.settings[guildId]?.prefix || 'w!'
+  const command = args[0].replace(prefix, '')
 
-  switch (args[1]) {
+  switch (command) {
     case 'prefix':
-      const newPrefix = args.slice(2).join(',')
-      database.ref(`/settings/${guildId}/prefix`).set(newPrefix)
-      return `:page_facing_up: 指令觸發前綴改為：${newPrefix}`
+      const newPrefix = args[1]
+      if (!newPrefix) {
+        return `:gear: 指令前綴：${prefix}`
+      }
+      await database.ref(`/settings/${guildId}/prefix`).set(newPrefix)
+      return `:gear: 指令前綴改為：${newPrefix}`
+
+    case 'triggers':
+      const newTriggers = args.slice(1).join(' ')
+      if (!args[2]) {
+        return `:gear: 抽選餐點：${cache.settings[guildId]?.triggers || '吃什麼'}`
+      }
+      await database.ref(`/settings/${guildId}/triggers`).set(newTriggers)
+      return `:gear: 抽選餐點改為：${newTriggers}`
 
     case 'add':
-      const newItems = args.slice(2).filter(arg => !items.includes(arg))
+      const newItems = args.slice(1).filter(arg => !items.includes(arg))
       if (newItems.length === 0) {
         return ':x: 這些品項已經有了'
       }
@@ -163,24 +189,23 @@ const handleCommand: (message: Message, guildId: string, args: string[]) => Prom
 
 const sendResponse = async (message: Message, responseContent: string) => {
   const responseMessage = await message.channel.send(responseContent)
-  loggerHook.send(
-    '[`TIME`] `GUILD_ID`: MESSAGE_CONTENT\n(**PROCESSING_TIME**ms) RESPONSE_CONTENT'
-      .replace('TIME', moment(message.createdTimestamp).format('HH:mm:ss'))
-      .replace('GUILD_ID', message.guild?.id || '')
-      .replace('MESSAGE_CONTENT', message.content)
-      .replace('PROCESSING_TIME', `${responseMessage.createdTimestamp - message.createdTimestamp}`)
-      .replace('RESPONSE_CONTENT', responseContent),
-  )
+  loggerHook
+    .send(
+      '[`TIME`] `GUILD_ID`: MESSAGE_CONTENT\n(**PROCESSING_TIME**ms) RESPONSE_CONTENT'
+        .replace('TIME', moment(message.createdTimestamp).format('HH:mm:ss'))
+        .replace('GUILD_ID', message.guild?.id || '')
+        .replace('MESSAGE_CONTENT', message.content)
+        .replace('PROCESSING_TIME', `${responseMessage.createdTimestamp - message.createdTimestamp}`)
+        .replace('RESPONSE_CONTENT', responseContent),
+    )
+    .catch(() => {})
 }
 
-const startedAt = Date.now()
 client.on('ready', () => {
-  const readyAt = Date.now()
   loggerHook.send(
-    '[`TIME`] USER_TAG is alive! (**PROCESSING_TIME**ms)'
+    '[`TIME`] USER_TAG is alive!'
       .replace('TIME', moment().format('HH:mm:ss'))
-      .replace('USER_TAG', client.user?.tag || '')
-      .replace('PROCESSING_TIME', `${readyAt - startedAt}`),
+      .replace('USER_TAG', client.user?.tag || ''),
   )
 })
 
