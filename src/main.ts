@@ -89,7 +89,7 @@ client.on('message', async message => {
   const args = message.content.replace(/\s+/g, ' ').split(' ')
   const messageType = message.content.startsWith(prefix)
     ? 'command'
-    : triggers.some(trigger => message.content === trigger)
+    : triggers.some(trigger => args[0] === trigger)
     ? 'item'
     : null
   if (!messageType) {
@@ -111,8 +111,10 @@ client.on('message', async message => {
   try {
     guildStatus[guildId] = 'processing'
     if (messageType === 'item') {
-      const item = getRandomItem()
-      await sendResponse(message, `:fork_knife_plate: ${message.member.displayName}：${item.name}`)
+      const tmp = parseInt(args[1])
+      const amount = Number.isSafeInteger(tmp) && tmp > 0 ? Math.min(5, tmp) : 1
+      const items = new Array(amount).fill(0).map(_ => getRandomItem().name)
+      await sendResponse(message, `:fork_knife_plate: ${message.member.displayName}：${items.join('、')}`)
     } else {
       const responseContent = await handleCommand(message, guildId, args)
       if (!responseContent) {
