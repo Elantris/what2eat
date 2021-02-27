@@ -1,3 +1,18 @@
 {
-  "typescript.tsdk": "node_modules/typescript/lib"
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "cSpell.words": [
+    "changhua",
+    "chiayi",
+    "hsinchu",
+    "hualien",
+    "kinmen",
+    "miaoli",
+    "nantou",
+    "penghu",
+    "pingtung",
+    "taitung",
+    "taoyuan",
+    "yilan",
+    "yunlin"
+  ]
 }

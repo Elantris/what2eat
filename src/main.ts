@@ -204,8 +204,9 @@ const sendResponse = async (message: Message, responseContent: string) => {
 }
 
 client.on('ready', () => {
+  client.user?.setActivity('Updated at 2021.02.28 | https://discord.gg/Ctwz4BB')
   loggerHook.send(
-    '[`TIME`] USER_TAG is alive!'
+    '[`TIME`] USER_TAG is online!'
       .replace('TIME', moment().format('HH:mm:ss'))
       .replace('USER_TAG', client.user?.tag || ''),
   )
