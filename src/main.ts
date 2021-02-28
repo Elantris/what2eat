@@ -82,7 +82,11 @@ client.on('message', async message => {
   const prefix = cache.settings[guildId]?.prefix || 'w!'
   const triggers = (cache.settings[guildId]?.triggers || '吃什麼').split(' ')
   if (new RegExp(`<@!{0,1}${client.user?.id}>`).test(message.content)) {
-    message.channel.send(`:gear: 伺服器設定\n指令前綴：${prefix}\n抽選餐點：${triggers.join(' ')}`)
+    message.channel.send(
+      ':stew: 我是 What2Eat 吃什麼機器人！\n\n指令前綴：`PREFIX_`，輸入 `PREFIX_help` 查看更多說明\n加入開發群組：DISCORD'
+        .replace(/PREFIX_/g, prefix)
+        .replace('DISCORD', 'https://discord.gg/Ctwz4BB'),
+    )
     return
   }
 
@@ -146,21 +150,29 @@ const handleCommand: (message: Message, guildId: string, args: string[]) => Prom
   args,
 ) => {
   const prefix = cache.settings[guildId]?.prefix || 'w!'
+  const triggers = (cache.settings[guildId]?.triggers || '吃什麼').split(' ')
   const command = args[0].replace(prefix, '')
 
   switch (command) {
+    case 'help':
+    case 'manual':
+      return ':question: 指令說明：\n\n`PREFIX_prefix` 修改機器人指令前綴\n`PREFIX_triggers` 修改抽選餐點的觸發條件\n加入開發群組：DISCORD'
+        .replace(/PREFIX_/g, prefix)
+        .replace('DISCORD', 'https://discord.gg/Ctwz4BB')
+
     case 'prefix':
       const newPrefix = args[1]
       if (!newPrefix) {
-        return `:gear: 指令前綴：${prefix}`
+        return `:gear: 指令前綴：\`${prefix}\``
       }
       await database.ref(`/settings/${guildId}/prefix`).set(newPrefix)
       return `:gear: 指令前綴改為：${newPrefix}`
 
+    case 'trigger':
     case 'triggers':
       const newTriggers = args.slice(1).join(' ')
       if (!args[2]) {
-        return `:gear: 抽選餐點：${cache.settings[guildId]?.triggers || '吃什麼'}`
+        return `:gear: 抽選餐點：${triggers.join(' ')}`
       }
       await database.ref(`/settings/${guildId}/triggers`).set(newTriggers)
       return `:gear: 抽選餐點改為：${newTriggers}`
