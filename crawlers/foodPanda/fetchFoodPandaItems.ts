@@ -4,7 +4,8 @@ import restaurantCodes from './restaurantCodes.json'
 
 const fetchFoodPandaItems = async () => {
   const items: { [key: string]: number } = {}
-  for (const restaurantCode of restaurantCodes) {
+  for (const index in restaurantCodes) {
+    const restaurantCode = restaurantCodes[index]
     try {
       const url = `https://www.foodpanda.com.tw/api/v1/vendors/${restaurantCode}?include=menus,menu_categories&order_time=${new Date().toISOString()}&language_id=6&opening_type=delivery`
 
@@ -31,9 +32,9 @@ const fetchFoodPandaItems = async () => {
         })
       })
 
-      console.log(restaurantCode, Object.keys(items).length)
+      console.log(index, restaurantCode, Object.keys(items).length)
     } catch (error) {
-      console.log(restaurantCode, error)
+      console.log(index, restaurantCode, error)
     }
   }
 

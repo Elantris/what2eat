@@ -7,7 +7,8 @@
     "start": "npm run build && node build/main.js",
     "build": "rm -rf ./build/* && ./node_modules/.bin/tsc",
     "pm2": "pm2 start build/main.js --name what2eat && pm2 monit",
-    "restart": "pm2 stop what2eat && pm2 reset what2eat && pm2 start what2eat && pm2 monit"
+    "restart": "pm2 stop what2eat && pm2 reset what2eat && pm2 start what2eat && pm2 monit",
+    "dev": "NODE_ENV=development ts-node src/main.ts"
   },
   "keywords": [],
   "author": "",
@@ -16,15 +17,13 @@
     "discord.js": "^12.5.1",
     "firebase-admin": "^9.5.0",
     "moment": "^2.29.1",
-    "node-fetch": "^2.6.1",
-    "ramda": "^0.27.1"
+    "node-fetch": "^2.6.1"
   },
   "devDependencies": {
-    "@types/node": "^14.14.31",
+    "@types/node": "^14.14.35",
     "@types/node-fetch": "^2.5.8",
-    "@types/ramda": "^0.27.38",
     "@types/ws": "^7.4.0",
     "cheerio": "^1.0.0-rc.5",
-    "typescript": "^4.2.2"
+    "typescript": "^4.2.3"
   }
 }
