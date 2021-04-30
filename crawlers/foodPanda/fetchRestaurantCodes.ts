@@ -1,6 +1,7 @@
 import cheerio from 'cheerio'
 import { writeFileSync } from 'fs'
 import fetch from 'node-fetch'
+import { join } from 'path'
 
 const cities = [
   'taipei-city',
@@ -37,13 +38,16 @@ const fetchRestaurantCodes = async () => {
       }
       restaurantCodes.push(elem.attribs.href.split('/')[2])
     })
+    console.log(city, restaurantCodes.length)
   }
 
-  return restaurantCodes
+  return restaurantCodes.sort()
 }
 
 fetchRestaurantCodes().then(restaurantCodes => {
-  writeFileSync('./restaurantCodes.json', JSON.stringify(restaurantCodes), { encoding: 'utf8' })
+  writeFileSync(join(__dirname, '../../src/restaurantCodes.json'), JSON.stringify(restaurantCodes), {
+    encoding: 'utf8',
+  })
 })
 
 export default fetchRestaurantCodes

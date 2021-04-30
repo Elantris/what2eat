@@ -1,8 +1,10 @@
-import { Client, Message, WebhookClient } from 'discord.js'
+import { Client, Message, MessageEmbedOptions, NewsChannel, TextChannel, Util, WebhookClient } from 'discord.js'
 import admin, { ServiceAccount } from 'firebase-admin'
+import { readFileSync } from 'fs'
 import moment from 'moment'
+import { join } from 'path'
 import config from './config'
-import foodPandaItems from './items.json'
+import restaurantCodes from './restaurantCodes.json'
 
 // firebase
 admin.initializeApp({
@@ -11,65 +13,96 @@ admin.initializeApp({
 })
 const database = admin.database()
 
-type CacheProps = {
+const cache: {
   [key: string]: any
-  items: {
-    [ItemName: string]: {
-      authorId: string
-      createdAt: number
-    }
+  hints: {
+    [key: string]: string
   }
   settings: {
-    [GuildID: string]: {
+    [GuildID in string]?: {
       prefix?: string
       triggers?: string
     }
   }
-}
-const cache: CacheProps = {
-  items: {},
+  restaurants: {
+    [Code in string]?: {
+      id: number
+      code: string
+      name: string
+      address: string
+      products: {
+        id: number
+        name: string
+        description: string
+      }[]
+    }
+  }
+} = {
+  hints: {},
   settings: {},
+  restaurants: {},
 }
-
-let items: string[] = Object.keys(foodPandaItems)
 
 const updateCache = (snapshot: admin.database.DataSnapshot) => {
   const key = snapshot.ref.parent?.key
   if (key && cache[key] && snapshot.key) {
     cache[key][snapshot.key] = snapshot.val()
-    items = [...Object.keys(foodPandaItems), ...Object.keys(cache.items)]
   }
 }
 const removeCache = (snapshot: admin.database.DataSnapshot) => {
   const key = snapshot.ref.parent?.key
   if (key && cache[key] && snapshot.key) {
     delete cache[key][snapshot.key]
-    items = [...Object.keys(foodPandaItems), ...Object.keys(cache.items)]
   }
 }
 
-database.ref('/items').on('child_added', updateCache)
-database.ref('/items').on('child_changed', updateCache)
-database.ref('/items').on('child_removed', removeCache)
+database.ref('/hits').on('child_added', updateCache)
+database.ref('/hits').on('child_changed', updateCache)
+database.ref('/hits').on('child_removed', removeCache)
 database.ref('/settings').on('child_added', updateCache)
 database.ref('/settings').on('child_changed', updateCache)
 database.ref('/settings').on('child_removed', removeCache)
 
-const getRandomItem: () => {
-  index: number
+const getHint = () => {
+  const allHints = Object.values(cache.hints)
+  const hint = allHints[Math.floor(Math.random() * allHints.length)] || ''
+  return hint
+}
+
+const getRandomProduct: () => {
+  id: number
   name: string
-} = () => {
-  const index = Math.floor(Math.random() * items.length)
+  description: string
+  restaurantCode: string
+} | null = () => {
+  const restaurantCode = restaurantCodes[Math.floor(Math.random() * restaurantCodes.length)]
+
+  if (!cache.restaurants[restaurantCode]) {
+    try {
+      cache.restaurants[restaurantCode] = JSON.parse(
+        readFileSync(join(__dirname, `./restaurants/${restaurantCode}.json`), { encoding: 'utf8' }),
+      )
+    } catch {
+      return null
+    }
+  }
+
+  const restaurant = cache.restaurants[restaurantCode]
+
+  if (!restaurant?.products.length) {
+    return null
+  }
+
+  const product = restaurant.products[Math.floor(Math.random() * restaurant.products.length)]
   return {
-    index,
-    name: items[index],
+    ...product,
+    restaurantCode,
   }
 }
 
 // discord
 const client = new Client()
 const loggerHook = new WebhookClient(...(config.DISCORD.LOGGER_HOOK as [string, string]))
-
 const userStatus: { [UserID: string]: 'processing' | 'cooling-down' | 'muted' } = {}
 
 client.on('message', async message => {
@@ -83,8 +116,9 @@ client.on('message', async message => {
   const triggers = (cache.settings[guildId]?.triggers || '吃什麼').split(' ')
   if (new RegExp(`<@!{0,1}${client.user?.id}>`).test(message.content)) {
     message.channel.send(
-      ':stew: What2Eat 吃什麼機器人！\n指令前綴：PREFIX\n說明文件：<MANUAL>\n開發群組：DISCORD'
+      ':stew: What2Eat 吃什麼機器人！\n指令前綴：PREFIX\n抽選餐點：TRIGGERS\n說明文件：<MANUAL>\n開發群組：DISCORD'
         .replace('PREFIX', prefix)
+        .replace('TRIGGERS', triggers.join(' '))
         .replace('MANUAL', 'https://hackmd.io/@eelayntris/what2eat')
         .replace('DISCORD', 'https://discord.gg/Ctwz4BB'),
     )
@@ -95,7 +129,7 @@ client.on('message', async message => {
   const messageType = message.content.startsWith(prefix)
     ? 'command'
     : triggers.some(trigger => args[0] === trigger)
-    ? 'item'
+    ? 'trigger'
     : null
   if (!messageType) {
     return
@@ -115,28 +149,46 @@ client.on('message', async message => {
   // handle command
   try {
     userStatus[message.author.id] = 'processing'
-    if (messageType === 'item') {
-      const tmp = parseInt(args[1])
-      const amount = Number.isSafeInteger(tmp) && tmp > 0 ? Math.min(5, tmp) : 1
-      const items = new Array(amount).fill(0).map(_ => getRandomItem().name)
-      await sendResponse(message, `:fork_knife_plate: ${message.member.displayName}：${items.join('、')}`)
+    if (messageType === 'trigger') {
+      while (1) {
+        const result = getRandomProduct()
+        if (!result) {
+          continue
+        }
+
+        await sendResponse(message, {
+          content: `:fork_knife_plate: ${message.member.displayName} 抽選的餐點：`,
+          embed: {
+            color: 0x51cf66,
+            title: result.name,
+            url: `https://www.foodpanda.com.tw/restaurant/${result.restaurantCode}`,
+            description: `${Util.escapeMarkdown(
+              result.description,
+            )}\n---\n:warning: 這個選項有問題嗎？請 [加入群組](https://discord.gg/Ctwz4BB) 回報給開發者`.trim(),
+            author: {
+              name: `${cache.restaurants[result.restaurantCode]?.name || ''} ${
+                cache.restaurants[result.restaurantCode]?.address || ''
+              }`,
+            },
+            footer: { text: `💡 ${getHint()}` },
+            image: { url: `https://images.deliveryhero.io/image/fd-tw/Products/${result.id}.jpg?width=400` },
+          },
+        })
+        break
+      }
     } else {
       const responseContent = await handleCommand(message, guildId, args)
       if (responseContent) {
-        await sendResponse(message, responseContent)
+        await sendResponse(message, {
+          content: responseContent,
+        })
       }
     }
   } catch (error) {
-    sendResponse(message, ':fire: 指令運行錯誤')
-    loggerHook
-      .send(
-        '[`TIME`] `GUILD_ID`: CONTENT\n```ERROR```'
-          .replace('TIME', moment(message.createdTimestamp).format('HH:mm:ss'))
-          .replace('GUILD_ID', guildId)
-          .replace('CONTENT', message.content)
-          .replace('ERROR', error),
-      )
-      .catch()
+    sendResponse(message, {
+      content: ':fire: 指令運行錯誤',
+      error,
+    })
   }
 
   userStatus[message.author.id] = 'cooling-down'
@@ -183,51 +235,70 @@ const handleCommand: (message: Message, guildId: string, args: string[]) => Prom
       }
       await database.ref(`/settings/${guildId}/triggers`).set(newTriggers)
       return `:gear: 抽選餐點改為：${newTriggers}`
-
-    case 'add':
-      const newItems = args.slice(1).filter(arg => !items.includes(arg))
-      if (newItems.length === 0) {
-        return ':x: 這些品項已經有了'
-      }
-
-      const updates: CacheProps['items'] = {}
-      newItems.forEach(newItem => {
-        updates[newItem] = {
-          authorId: message.author.id,
-          createdAt: message.createdTimestamp,
-        }
-      })
-      await database.ref(`/items`).update(updates)
-
-      return ':white_check_mark: MEMBER_NAME 成功新增 COUNT 個品項：ITEMS'
-        .replace('MEMBER_NAME', message.member?.displayName || '')
-        .replace('COUNT', `${newItems.length}`)
-        .replace('ITEMS', newItems.join('、'))
   }
 
   return ''
 }
 
-const sendResponse = async (message: Message, responseContent: string) => {
-  const responseMessage = await message.channel.send(responseContent).catch()
+const sendResponse = async (
+  message: Message,
+  response: {
+    content: string
+    embed?: MessageEmbedOptions
+    error?: Error
+  },
+) => {
+  const responseMessage = await message.channel.send(response.content, { embed: response.embed }).catch(() => null)
   loggerHook
     .send(
-      '[`TIME`] `GUILD_ID`: MESSAGE_CONTENT\n(**PROCESSING_TIME**ms) RESPONSE_CONTENT'
+      '[`TIME`] `GUILD_ID`: MESSAGE_CONTENT\nRESPONSE_CONTENT'
         .replace('TIME', moment(message.createdTimestamp).format('HH:mm:ss'))
         .replace('GUILD_ID', message.guild?.id || '')
         .replace('MESSAGE_CONTENT', message.content)
-        .replace('PROCESSING_TIME', `${responseMessage.createdTimestamp - message.createdTimestamp}`)
-        .replace('RESPONSE_CONTENT', responseContent),
+        .replace('RESPONSE_CONTENT', responseMessage?.content || ''),
+      {
+        embeds: [
+          ...(responseMessage?.embeds || []),
+          {
+            color: response.error ? 0xff6b6b : undefined,
+            fields: [
+              {
+                name: 'Status',
+                value: response.error ? '```ERROR```'.replace('ERROR', `${response.error}`) : 'SUCCESS',
+              },
+              {
+                name: 'Guild',
+                value: message.guild ? `${message.guild.id}\n${Util.escapeMarkdown(message.guild.name)}` : '--',
+                inline: true,
+              },
+              {
+                name: 'Channel',
+                value:
+                  message.channel instanceof TextChannel || message.channel instanceof NewsChannel
+                    ? `${message.channel.id}\n${Util.escapeMarkdown(message.channel.name)}`
+                    : '--',
+                inline: true,
+              },
+              {
+                name: 'User',
+                value: `${message.author.id}\n${Util.escapeMarkdown(message.author.tag)}`,
+                inline: true,
+              },
+            ],
+            footer: responseMessage
+              ? { text: `${responseMessage.createdTimestamp - message.createdTimestamp} ms` }
+              : undefined,
+          },
+        ],
+      },
     )
-    .catch()
+    .catch(() => {})
 }
 
 client.on('ready', () => {
-  client.user?.setActivity('Version 2021.03.16 | https://discord.gg/Ctwz4BB')
+  client.user?.setActivity('Version 2021.05.01 | https://discord.gg/Ctwz4BB')
   loggerHook.send(
-    '[`TIME`] USER_TAG'
-      .replace('TIME', moment().format('HH:mm:ss'))
-      .replace('USER_TAG', client.user?.tag || ''),
+    '[`TIME`] USER_TAG'.replace('TIME', moment().format('HH:mm:ss')).replace('USER_TAG', client.user?.tag || ''),
   )
 })
 
