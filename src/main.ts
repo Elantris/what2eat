@@ -75,29 +75,33 @@ const getRandomProduct: () => {
   description: string
   restaurantCode: string
 } | null = () => {
-  const restaurantCode = restaurantCodes[Math.floor(Math.random() * restaurantCodes.length)]
+  for (let i = 0; i < 10; i++) {
+    const restaurantCode = restaurantCodes[Math.floor(Math.random() * restaurantCodes.length)]
 
-  if (!cache.restaurants[restaurantCode]) {
-    try {
-      cache.restaurants[restaurantCode] = JSON.parse(
-        readFileSync(join(__dirname, `./restaurants/${restaurantCode}.json`), { encoding: 'utf8' }),
-      )
-    } catch {
-      return null
+    if (!cache.restaurants[restaurantCode]) {
+      try {
+        cache.restaurants[restaurantCode] = JSON.parse(
+          readFileSync(join(__dirname, `./restaurants/${restaurantCode}.json`), { encoding: 'utf8' }),
+        )
+      } catch {
+        continue
+      }
+    }
+
+    const restaurant = cache.restaurants[restaurantCode]
+
+    if (!restaurant?.products.length) {
+      continue
+    }
+
+    const product = restaurant.products[Math.floor(Math.random() * restaurant.products.length)]
+    return {
+      ...product,
+      restaurantCode,
     }
   }
 
-  const restaurant = cache.restaurants[restaurantCode]
-
-  if (!restaurant?.products.length) {
-    return null
-  }
-
-  const product = restaurant.products[Math.floor(Math.random() * restaurant.products.length)]
-  return {
-    ...product,
-    restaurantCode,
-  }
+  return null
 }
 
 // discord
@@ -150,12 +154,8 @@ client.on('message', async message => {
   try {
     userStatus[message.author.id] = 'processing'
     if (messageType === 'trigger') {
-      while (1) {
-        const result = getRandomProduct()
-        if (!result) {
-          continue
-        }
-
+      const result = getRandomProduct()
+      if (result) {
         await sendResponse(message, {
           content: `:fork_knife_plate: ${message.member.displayName} 抽選的餐點：`,
           embed: {
@@ -174,14 +174,13 @@ client.on('message', async message => {
             image: { url: `https://images.deliveryhero.io/image/fd-tw/Products/${result.id}.jpg?width=400` },
           },
         })
-        break
+      } else {
+        await sendResponse(message, { content: ':question: 請稍後再試' })
       }
     } else {
-      const responseContent = await handleCommand(message, guildId, args)
-      if (responseContent) {
-        await sendResponse(message, {
-          content: responseContent,
-        })
+      const content = await handleCommand(message, guildId, args)
+      if (content) {
+        await sendResponse(message, { content })
       }
     }
   } catch (error) {
