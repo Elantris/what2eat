@@ -56,9 +56,9 @@ const removeCache = (snapshot: admin.database.DataSnapshot) => {
   }
 }
 
-database.ref('/hits').on('child_added', updateCache)
-database.ref('/hits').on('child_changed', updateCache)
-database.ref('/hits').on('child_removed', removeCache)
+database.ref('/hints').on('child_added', updateCache)
+database.ref('/hints').on('child_changed', updateCache)
+database.ref('/hints').on('child_removed', removeCache)
 database.ref('/settings').on('child_added', updateCache)
 database.ref('/settings').on('child_changed', updateCache)
 database.ref('/settings').on('child_removed', removeCache)
@@ -81,7 +81,7 @@ const getRandomProduct: () => {
     if (!cache.restaurants[restaurantCode]) {
       try {
         cache.restaurants[restaurantCode] = JSON.parse(
-          readFileSync(join(__dirname, `./restaurants/${restaurantCode}.json`), { encoding: 'utf8' }),
+          readFileSync(join(__dirname, `../data/restaurants/${restaurantCode}.json`), { encoding: 'utf8' }),
         )
       } catch {
         continue

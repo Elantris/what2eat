@@ -181,7 +181,7 @@ const fetchFoodPandaItems = async () => {
       })
 
       if (restaurant.products.length > 0) {
-        writeFileSync(join(__dirname, `../../src/restaurants/${restaurantCode}.json`), JSON.stringify(restaurant), {
+        writeFileSync(join(__dirname, `../../data/restaurants/${restaurantCode}.json`), JSON.stringify(restaurant), {
           encoding: 'utf8',
         })
       }
