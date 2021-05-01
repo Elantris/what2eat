@@ -6,7 +6,7 @@
   "scripts": {
     "start": "npm run build && node build/main.js",
     "build": "rm -rf ./build/* && ./node_modules/.bin/tsc",
-    "pm2": "pm2 start build/main.js --name what2eat && pm2 monit",
+    "pm2": "pm2 start build/main.js --name what2eat --restart-delay 60000 && pm2 monit",
     "restart": "pm2 stop what2eat && pm2 reset what2eat && pm2 start what2eat && pm2 monit",
     "dev": "NODE_ENV=development ts-node src/main.ts"
   },

@@ -156,22 +156,22 @@ client.on('message', async message => {
     if (messageType === 'trigger') {
       const result = getRandomProduct()
       if (result) {
+        const restaurant = cache.restaurants[result.restaurantCode]
         await sendResponse(message, {
-          content: `:fork_knife_plate: ${message.member.displayName} 抽選的餐點：`,
+          content: `:fork_knife_plate: ${message.member.displayName} 抽選的餐點：${result.name}`,
           embed: {
             color: 0x51cf66,
-            title: result.name,
+            author: {
+              iconURL: message.author.displayAvatarURL(),
+              name: message.member.displayName,
+            },
+            title: `${Util.escapeMarkdown(restaurant?.name || '')} - ${result.name}`,
             url: `https://www.foodpanda.com.tw/restaurant/${result.restaurantCode}`,
-            description: `${Util.escapeMarkdown(
+            description: `${Util.escapeMarkdown(restaurant?.address || '')}\n${Util.escapeMarkdown(
               result.description,
             )}\n---\n:warning: 這個選項有問題嗎？請 [加入群組](https://discord.gg/Ctwz4BB) 回報給開發者`.trim(),
-            author: {
-              name: `${cache.restaurants[result.restaurantCode]?.name || ''} ${
-                cache.restaurants[result.restaurantCode]?.address || ''
-              }`,
-            },
-            footer: { text: `💡 ${getHint()}` },
             image: { url: `https://images.deliveryhero.io/image/fd-tw/Products/${result.id}.jpg?width=400` },
+            footer: { text: `💡 ${getHint()}` },
           },
         })
       } else {
