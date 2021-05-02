@@ -1,10 +1,10 @@
 import { Client, Message, MessageEmbedOptions, NewsChannel, TextChannel, Util, WebhookClient } from 'discord.js'
 import admin, { ServiceAccount } from 'firebase-admin'
-import { readFileSync } from 'fs'
+import { readdirSync, readFileSync } from 'fs'
 import moment from 'moment'
 import { join } from 'path'
 import config from './config'
-import restaurantCodes from './restaurantCodes.json'
+import { ProductProps, RestaurantProps } from './types'
 
 // firebase
 admin.initializeApp({
@@ -15,6 +15,9 @@ const database = admin.database()
 
 const cache: {
   [key: string]: any
+  banned: {
+    [ID in string]?: any
+  }
   hints: {
     [key: string]: string
   }
@@ -25,19 +28,10 @@ const cache: {
     }
   }
   restaurants: {
-    [Code in string]?: {
-      id: number
-      code: string
-      name: string
-      address: string
-      products: {
-        id: number
-        name: string
-        description: string
-      }[]
-    }
+    [RestaurantID in string]?: RestaurantProps
   }
 } = {
+  banned: {},
   hints: {},
   settings: {},
   restaurants: {},
@@ -56,6 +50,9 @@ const removeCache = (snapshot: admin.database.DataSnapshot) => {
   }
 }
 
+database.ref('/banned').on('child_added', updateCache)
+database.ref('/banned').on('child_changed', updateCache)
+database.ref('/banned').on('child_removed', removeCache)
 database.ref('/hints').on('child_added', updateCache)
 database.ref('/hints').on('child_changed', updateCache)
 database.ref('/hints').on('child_removed', removeCache)
@@ -69,35 +66,36 @@ const getHint = () => {
   return hint
 }
 
+const restaurantIds = readdirSync(join(__dirname, '../data/restaurants'), { encoding: 'utf8' })
+  .filter(filename => filename.includes('json'))
+  .map(filename => filename.replace('.json', ''))
+
 const getRandomProduct: () => {
-  id: number
-  name: string
-  description: string
-  restaurantCode: string
+  restaurant: RestaurantProps
+  product: ProductProps
 } | null = () => {
   for (let i = 0; i < 10; i++) {
-    const restaurantCode = restaurantCodes[Math.floor(Math.random() * restaurantCodes.length)]
-
-    if (!cache.restaurants[restaurantCode]) {
+    const restaurantId = restaurantIds[Math.floor(Math.random() * restaurantIds.length)]
+    if (!cache.restaurants[restaurantId]) {
       try {
-        cache.restaurants[restaurantCode] = JSON.parse(
-          readFileSync(join(__dirname, `../data/restaurants/${restaurantCode}.json`), { encoding: 'utf8' }),
+        cache.restaurants[restaurantId] = JSON.parse(
+          readFileSync(join(__dirname, `../data/restaurants/${restaurantId}.json`), { encoding: 'utf8' }),
         )
       } catch {
         continue
       }
     }
 
-    const restaurant = cache.restaurants[restaurantCode]
-
+    const restaurant = cache.restaurants[restaurantId]
     if (!restaurant?.products.length) {
       continue
     }
 
     const product = restaurant.products[Math.floor(Math.random() * restaurant.products.length)]
+
     return {
-      ...product,
-      restaurantCode,
+      restaurant,
+      product,
     }
   }
 
@@ -110,7 +108,13 @@ const loggerHook = new WebhookClient(...(config.DISCORD.LOGGER_HOOK as [string, 
 const userStatus: { [UserID: string]: 'processing' | 'cooling-down' | 'muted' } = {}
 
 client.on('message', async message => {
-  if (message.author.bot || !message.guild || !message.member) {
+  if (
+    message.author.bot ||
+    !message.guild ||
+    !message.member ||
+    cache.banned[message.author.id] ||
+    cache.banned[message.guild.id]
+  ) {
     return
   }
 
@@ -120,11 +124,9 @@ client.on('message', async message => {
   const triggers = (cache.settings[guildId]?.triggers || '吃什麼').split(' ')
   if (new RegExp(`<@!{0,1}${client.user?.id}>`).test(message.content)) {
     message.channel.send(
-      ':stew: What2Eat 吃什麼機器人！\n指令前綴：PREFIX\n抽選餐點：TRIGGERS\n說明文件：<MANUAL>\n開發群組：DISCORD'
+      ':stew: What2Eat 吃什麼機器人！\n指令前綴：PREFIX\n抽選餐點：TRIGGERS'
         .replace('PREFIX', prefix)
-        .replace('TRIGGERS', triggers.join(' '))
-        .replace('MANUAL', 'https://hackmd.io/@eelayntris/what2eat')
-        .replace('DISCORD', 'https://discord.gg/Ctwz4BB'),
+        .replace('TRIGGERS', triggers.join(' ')),
     )
     return
   }
@@ -151,37 +153,49 @@ client.on('message', async message => {
   }
 
   // handle command
+  userStatus[message.author.id] = 'processing'
+
   try {
-    userStatus[message.author.id] = 'processing'
     if (messageType === 'trigger') {
       const result = getRandomProduct()
-      if (result) {
-        const restaurant = cache.restaurants[result.restaurantCode]
-        await sendResponse(message, {
-          content: `:fork_knife_plate: ${message.member.displayName} 抽選的餐點：${result.name}`,
-          embed: {
-            color: 0x51cf66,
-            author: {
-              iconURL: message.author.displayAvatarURL(),
-              name: message.member.displayName,
-            },
-            title: `${Util.escapeMarkdown(restaurant?.name || '')} - ${result.name}`,
-            url: `https://www.foodpanda.com.tw/restaurant/${result.restaurantCode}`,
-            description: `${Util.escapeMarkdown(restaurant?.address || '')}\n${Util.escapeMarkdown(
-              result.description,
-            )}\n---\n:warning: 這個選項有問題嗎？請 [加入群組](https://discord.gg/Ctwz4BB) 回報給開發者`.trim(),
-            image: { url: `https://images.deliveryhero.io/image/fd-tw/Products/${result.id}.jpg?width=400` },
-            footer: { text: `💡 ${getHint()}` },
-          },
-        })
-      } else {
+      if (!result) {
         await sendResponse(message, { content: ':question: 請稍後再試' })
+        delete userStatus[message.author.id]
+        return
       }
+
+      const imageUrl =
+        result.restaurant.type === 'foodPanda'
+          ? `https://images.deliveryhero.io/image/fd-tw/Products/${result.product.id}.jpg?width=400`
+          : result.product.imageUrl
+
+      await sendResponse(message, {
+        content: `:fork_knife_plate: ${message.member.displayName} 抽選的餐點：${result.product.name}`,
+        embed: {
+          color: 0x51cf66,
+          author: {
+            iconURL: message.author.displayAvatarURL(),
+            name: message.member.displayName,
+          },
+          title: Util.escapeMarkdown(`${result.restaurant.name} - ${result.product.name}`),
+          url: result.restaurant.url,
+          description: `:round_pushpin: ${Util.escapeMarkdown(
+            result.restaurant.address,
+          )}\n:receipt: ${Util.escapeMarkdown(
+            result.product.description || '',
+          )}\n-----\n:warning: 這個選項有問題嗎？[加入群組](https://discord.gg/Ctwz4BB) 回報給開發者`.trim(),
+          image: imageUrl ? { url: imageUrl } : undefined,
+          footer: { text: `💡 ${getHint()}` },
+        },
+      })
     } else {
       const content = await handleCommand(message, guildId, args)
-      if (content) {
-        await sendResponse(message, { content })
+      if (!content) {
+        delete userStatus[message.author.id]
+        return
       }
+
+      await sendResponse(message, { content })
     }
   } catch (error) {
     sendResponse(message, {
@@ -208,7 +222,9 @@ const handleCommand: (message: Message, guildId: string, args: string[]) => Prom
 
   switch (command) {
     case 'help':
-      return ':stew: What2Eat 吃什麼機器人！\n說明文件：<MANUAL>\n開發群組：DISCORD'
+      return ':stew: What2Eat 吃什麼機器人！\n指令前綴：PREFIX\n抽選餐點：TRIGGERS\n說明文件：<MANUAL>\n開發群組：DISCORD'
+        .replace('PREFIX', prefix)
+        .replace('TRIGGERS', triggers.join(' '))
         .replace('MANUAL', 'https://hackmd.io/@eelayntris/what2eat')
         .replace('DISCORD', 'https://discord.gg/Ctwz4BB')
 
@@ -248,6 +264,7 @@ const sendResponse = async (
   },
 ) => {
   const responseMessage = await message.channel.send(response.content, { embed: response.embed }).catch(() => null)
+
   loggerHook
     .send(
       '[`TIME`] `GUILD_ID`: MESSAGE_CONTENT\nRESPONSE_CONTENT'
@@ -295,7 +312,7 @@ const sendResponse = async (
 }
 
 client.on('ready', () => {
-  client.user?.setActivity('Version 2021.05.01 | https://discord.gg/Ctwz4BB')
+  client.user?.setActivity('Version 2021.05.02 | https://discord.gg/Ctwz4BB')
   loggerHook.send(
     '[`TIME`] USER_TAG'.replace('TIME', moment().format('HH:mm:ss')).replace('USER_TAG', client.user?.tag || ''),
   )
