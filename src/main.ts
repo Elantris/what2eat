@@ -241,13 +241,13 @@ const handleCommand: (message: Message, guildId: string, args: string[]) => Prom
 
     case 'trigger':
     case 'triggers':
-      const newTriggers = args.slice(1).join(' ')
-      if (!args[2]) {
+      if (!args[1]) {
         return `:gear: 抽選餐點：${triggers.join(' ')}`
       }
       if (!isAdmin) {
         return ':no_entry_sign: 只有管理員才可以修改抽選餐點'
       }
+      const newTriggers = args.slice(1).join(' ')
       await database.ref(`/settings/${guildId}/triggers`).set(newTriggers)
       return `:gear: 抽選餐點改為：${newTriggers}`
   }
