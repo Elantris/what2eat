@@ -3,7 +3,7 @@
 const config = {
   DISCORD: {
     TOKEN: '',
-    LOGGER_HOOK: ['', ''],
+    LOGGER_CHANNEL_ID: '',
   },
   FIREBASE: {
     databaseURL: 'https://<PROJECT-ID>.firebaseio.com',

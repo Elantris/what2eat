@@ -41,6 +41,7 @@ const bannedWords: string[] = [
   '我',
   '皆',
   '擇',
+  '號',
   '只有',
   '套餐',
   '本店',
@@ -55,7 +56,6 @@ const bannedWords: string[] = [
   '私訊',
   '預定',
   '添加',
-  '號餐',
   '本土',
   '供應',
   '產地',
@@ -105,9 +105,11 @@ const bannedWords: string[] = [
   '選項',
   '出餐',
   '塑膠',
+  '部份',
   '台灣豬',
   '悄悄話',
   '即日起',
+  '全家餐',
   '肉品來源',
 
   // other
@@ -117,8 +119,10 @@ const bannedWords: string[] = [
   '出前',
 ]
 
-const filterProductName: (productName: string) => string | null = productName => {
-  const name = productName.replace(/[\x20-\x7E]/g, '').trim()
+const filterProductName: (
+  productName: string,
+) => string | null = productName => {
+  const name = productName.replace(/[\x00-\x7F]/g, '').trim()
 
   if (name.length < 2 || bannedWords.some(word => name.includes(word))) {
     return null

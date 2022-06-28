@@ -103,7 +103,9 @@ dist
 # TernJS port file
 .tern-port
 
-config.ts
-build
 tmp
+raw
 data
+build
+config.ts
+token
