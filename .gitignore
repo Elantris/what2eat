@@ -106,6 +106,7 @@ dist
 tmp
 raw
 data
+data_old
 build
 config.ts
 token
