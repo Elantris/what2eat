@@ -112,6 +112,8 @@ const bannedWords: string[] = [
   '台灣豬',
   '悄悄話',
   '肉品來源',
+
+  '人份',
 ]
 
 const filterProductName: (productName: string) => string | null = productName => {

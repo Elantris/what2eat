@@ -1,6 +1,6 @@
 import axios from 'axios'
 import { load } from 'cheerio'
-import { readdirSync, readFileSync, writeFileSync } from 'fs'
+import { existsSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import filterProductName from './filterProductName'
 import { RestaurantProps } from './types'
@@ -240,6 +240,8 @@ const getProducts = () => {
         '萊爾富',
         '小三美日',
         '棉花田生機園地',
+        'innisfree',
+        '統一',
       ].some(key => file.data.name.includes(key))
     ) {
       return
@@ -270,9 +272,13 @@ const getProducts = () => {
       })
     })
 
+    const filePath = join(__dirname, `../data/${restaurant.id}.json`)
     if (restaurant.products.length > 5) {
+      writeFileSync(filePath, JSON.stringify(restaurant), { encoding: 'utf8' })
       console.log(`Restaurant ${restaurant.id} has ${restaurant.products.length} products`)
-      writeFileSync(join(__dirname, `../data/${restaurant.id}.json`), JSON.stringify(restaurant), { encoding: 'utf8' })
+    } else if (existsSync(filePath)) {
+      unlinkSync(filePath)
+      console.log(`Restaurant ${restaurant.id} is removed`)
     }
   })
 }

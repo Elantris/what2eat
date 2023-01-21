@@ -1,6 +1,7 @@
 {
   "typescript.tsdk": "node_modules/typescript/lib",
   "cSpell.words": [
+    "arvz",
     "changhua",
     "chiayi",
     "chromedriver",
@@ -9,6 +10,7 @@
     "foodpanda",
     "hsinchu",
     "hualien",
+    "innisfree",
     "kinmen",
     "luxon",
     "miaoli",
