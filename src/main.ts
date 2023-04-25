@@ -5,6 +5,7 @@ import {
   Client,
   ContextMenuCommandBuilder,
   escapeMarkdown,
+  Events,
   Message,
   MessageContextMenuCommandInteraction,
   REST,
@@ -129,7 +130,7 @@ const client = new Client({
   intents: ['Guilds'],
 })
 
-client.on('interactionCreate', async interaction => {
+client.on(Events.InteractionCreate, async interaction => {
   if (
     !cache.isReady ||
     !interaction.inGuild() ||
@@ -191,12 +192,7 @@ const commandPick: CommandProps = async interaction => {
   }
 
   if (cache.isCooling[guildId] && interaction.user.id !== config.DISCORD.OWNER_ID) {
-    if (interaction.isChatInputCommand()) {
-      const cooldownResponse = await interaction.reply({ content: ':ice_cube:', fetchReply: true })
-      setTimeout(() => {
-        cooldownResponse.delete()
-      }, 3000)
-    }
+    await interaction.reply({ content: ':ice_cube:', ephemeral: true })
     return
   }
 
@@ -235,7 +231,7 @@ const commandPick: CommandProps = async interaction => {
         .replace('{DESCRIPTION}', escapeMarkdown(result.product.description || ''))
         .trim(),
       image: result.product.image ? { url: result.product.image } : undefined,
-      footer: { text: 'Version 2022-11-20' },
+      footer: { text: 'Version 2023-04-22' },
     },
     options: {
       restaurant: result.restaurant,
@@ -341,22 +337,20 @@ const sendLog: (options: {
   }
 }
 
-client.on('ready', async client => {
+client.on(Events.ClientReady, async client => {
   const logChannel = client.channels.cache.get(config.DISCORD.LOGGER_CHANNEL_ID)
   if (logChannel?.type !== ChannelType.GuildText) {
     console.error('Log Channel Not Found')
     process.exit(-1)
   }
   cache.logChannel = logChannel
-  cache.logChannel.send(
-    '[`{TIME}`] {USER_TAG}'.replace('{TIME}', timeFormatter()).replace('{USER_TAG}', client.user.tag),
-  )
+  cache.logChannel.send(`\`${timeFormatter()}\` ${client.user.tag}`)
 
   loadRestaurants()
 
   setInterval(() => {
-    client.user?.setActivity(`/what2eat`)
-  }, 60000)
+    client.user.setActivity(`on ${client.guilds.cache.size} guilds.`)
+  }, 10000)
 })
 
 client.login(config.DISCORD.TOKEN)
