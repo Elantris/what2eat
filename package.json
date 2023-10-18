@@ -8,21 +8,25 @@
     "pm2": "pm2 start build/main.js --name what2eat --restart-delay 60000 && pm2 monit",
     "restart": "pm2 stop what2eat && pm2 reset what2eat && pm2 start what2eat && pm2 monit",
     "dev": "NODE_ENV=development ts-node src/main.ts",
-    "push": "rsync -arvz --delete build package.json pnpm-lock.yaml data elantris@embpr:/Users/elantris/Project/what2eat"
+    "push:embpr": "rsync -arvz --delete build package.json pnpm-lock.yaml data elantris@embpr:/Users/elantris/Project/what2eat",
+    "push:gcp": "rsync -arvz --delete build package.json pnpm-lock.yaml data elantris@gcp:/home/elantris/projects/what2eat",
+    "push:aws": "rsync -arvz --delete build package.json pnpm-lock.yaml data ec2-user@aws:/home/ec2-user/projects/what2eat",
+    "push:garyuu": "rsync -arvz --delete build package.json pnpm-lock.yaml data elantris@garyuu.duckdns.org:/home/elantris/projects/what2eat",
+    "push": "npm run push:garyuu"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
     "@firebase/app-types": "~0.9.0",
-    "@types/luxon": "^3.3.0",
-    "@types/node": "^18.16.0",
-    "@types/ws": "^8.5.4",
-    "axios": "^1.3.6",
-    "chalk": "^5.2.0",
-    "discord.js": "^14.9.0",
-    "firebase-admin": "^11.7.0",
-    "luxon": "^3.3.0",
-    "typescript": "^5.0.4"
+    "@types/luxon": "^3.3.2",
+    "@types/node": "^20.8.6",
+    "@types/ws": "^8.5.7",
+    "axios": "^1.5.1",
+    "chalk": "^5.3.0",
+    "discord.js": "^14.13.0",
+    "firebase-admin": "^11.11.0",
+    "luxon": "^3.4.3",
+    "typescript": "^5.2.2"
   }
 }

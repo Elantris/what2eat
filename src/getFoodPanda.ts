@@ -10,22 +10,22 @@ const cityIds: {
   'taipei-city': '44814',
   'new-taipei-city': '47626',
   'taichung-city': '44388',
-  'kaohsiung-city': '48632',
-  'hsinchu-city': '49352',
-  'taoyuan-city': '49825',
-  keelung: '55757',
   'tainan-city': '17',
-  'miaoli-county': '14',
-  'chiayi-city': '55762',
-  changhua: '8',
-  'yilan-city': '19',
-  'pingtung-city': '16',
-  'yunlin-county': '20',
-  hualien: '11',
-  'nantou-county': '15',
   'taitung-county': '18',
-  'penghu-city': '55760',
+  changhua: '8',
+  'chiayi-city': '55762',
+  'hsinchu-city': '49352',
+  hualien: '11',
+  'kaohsiung-city': '48632',
+  keelung: '55757',
   'kinmen-city': '55759',
+  'miaoli-county': '14',
+  'nantou-county': '15',
+  'penghu-city': '55760',
+  'pingtung-city': '16',
+  'taoyuan-city': '49825',
+  'yilan-city': '19',
+  'yunlin-county': '20',
 }
 
 const getRestaurantCodes = async () => {
@@ -34,48 +34,48 @@ const getRestaurantCodes = async () => {
   for (const cityName in cityIds) {
     if (!existsSync(join(__dirname, `../raw/foodPanda/cityRequest/${cityName}.json`))) {
       const response = await axios({
+        method: 'GET',
         url: 'https://disco.deliveryhero.io/listing/api/v1/pandora/vendors?language_id=6&vertical=restaurants&country=tw&include=characteristics&configuration=Variant1&offset=0&limit=&sort=&city_id={{CITY_ID}}'.replace(
           '{{CITY_ID}}',
           cityIds[cityName],
         ),
+        responseType: 'json',
         // credentials: 'omit',
         withCredentials: true,
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) Gecko/20100101 Firefox/110.0',
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) Gecko/20100101 Firefox/118.0',
           Accept: 'application/json, text/plain, */*',
           'Accept-Language': 'zh-TW,zh;q=0.8,en-US;q=0.5,en;q=0.3',
-          'Sec-Fetch-Dest': 'empty',
-          'Sec-Fetch-Mode': 'no-cors',
-          'Sec-Fetch-Site': 'cross-site',
           'X-FP-API-KEY': 'volo',
           'perseus-client-id': '1677518846092.793650064255124400.svmia69ahq',
-          'perseus-session-id': '1677518846092.776547402486814800.37hgezctdl',
+          'perseus-session-id': '1697532353722.670325556598349400.hbusypp59a',
           'x-disco-client-id': 'web',
+          'Sec-Fetch-Dest': 'empty',
+          'Sec-Fetch-Mode': 'cors',
+          'Sec-Fetch-Site': 'cross-site',
+          'dps-session-id': '',
           Pragma: 'no-cache',
           'Cache-Control': 'no-cache',
-          Refferrer: 'https://www.foodpanda.com.tw/',
+          Referrer: 'https://www.foodpanda.com.tw/',
         },
-        method: 'GET',
         // referrer: 'https://www.foodpanda.com.tw/',
         // mode: 'cors',
       })
 
-      writeFileSync(join(__dirname, `../raw/foodPanda/cityRequest/${cityName}.json`), JSON.stringify(response.data), {
-        encoding: 'utf8',
-      })
+      writeFileSync(
+        join(__dirname, `../raw/foodPanda/cityRequest/${cityName}.json`),
+        JSON.stringify(response.data),
+        'utf8',
+      )
     }
 
-    const cityData = JSON.parse(
-      readFileSync(join(__dirname, `../raw/foodPanda/cityRequest/${cityName}.json`), { encoding: 'utf8' }),
-    )
+    const cityData = JSON.parse(readFileSync(join(__dirname, `../raw/foodPanda/cityRequest/${cityName}.json`), 'utf8'))
 
     cityData.data.items.forEach((item: any) => {
       restaurantCodes.push(item.code)
     })
 
-    writeFileSync(join(__dirname, `../raw/foodPanda/restaurantCodes.json`), JSON.stringify(restaurantCodes), {
-      encoding: 'utf8',
-    })
+    writeFileSync(join(__dirname, `../raw/foodPanda/restaurantCodes.json`), JSON.stringify(restaurantCodes), 'utf8')
   }
 }
 
@@ -100,25 +100,24 @@ const excludeNames = new RegExp(
 )
 
 const getRestaurantProducts = async () => {
-  const restaurantCodes = JSON.parse(
-    readFileSync(join(__dirname, `../raw/foodPanda/restaurantCodes.json`), { encoding: 'utf8' }),
-  )
+  let i = 0
+  const restaurantCodes = JSON.parse(readFileSync(join(__dirname, `../raw/foodPanda/restaurantCodes.json`), 'utf8'))
 
   for (const restaurantCode of restaurantCodes) {
     let restaurantFile: any = {}
     if (existsSync(join(__dirname, `../raw/foodPanda/restaurantRequest/${restaurantCode}.json`))) {
       restaurantFile = JSON.parse(
-        readFileSync(join(__dirname, `../raw/foodPanda/restaurantRequest/${restaurantCode}.json`), {
-          encoding: 'utf8',
-        }),
+        readFileSync(join(__dirname, `../raw/foodPanda/restaurantRequest/${restaurantCode}.json`), 'utf8'),
       )
     } else {
       try {
         const response = await axios({
+          method: 'GET',
           url: 'https://tw.fd-api.com/api/v5/vendors/{{RESTAURANT_CODE}}?include=menus,bundles,multiple_discounts&language_id=6&opening_type=delivery&basket_currency=TWD'.replace(
             '{{RESTAURANT_CODE}}',
             restaurantCode,
           ),
+          responseType: 'json',
           // "credentials": "include",
           withCredentials: true,
           headers: {
@@ -138,14 +137,13 @@ const getRestaurantProducts = async () => {
             Refferrer: 'https://www.foodpanda.com.tw/',
           },
           // referrer: 'https://www.foodpanda.com.tw/',
-          method: 'GET',
           // mode: 'cors',
         })
 
         writeFileSync(
           join(__dirname, `../raw/foodPanda/restaurantRequest/${restaurantCode}.json`),
           JSON.stringify(response.data),
-          { encoding: 'utf8' },
+          'utf8',
         )
         restaurantFile = response.data
       } catch {
@@ -185,8 +183,10 @@ const getRestaurantProducts = async () => {
 
     const filePath = join(__dirname, `../data/${restaurant.id}.json`)
     if (restaurant.products.length > 20) {
-      writeFileSync(filePath, JSON.stringify(restaurant), { encoding: 'utf8' })
-      console.log(`Restaurant ${restaurant.id} has ${restaurant.products.length} products`)
+      writeFileSync(filePath, JSON.stringify(restaurant), 'utf8')
+      console.log(
+        `${++i}/${restaurantCodes.length} Restaurant ${restaurant.id} has ${restaurant.products.length} products`,
+      )
     } else if (existsSync(filePath)) {
       unlinkSync(filePath)
       console.log(`Restaurant ${restaurant.id} is removed`)
@@ -195,6 +195,6 @@ const getRestaurantProducts = async () => {
 }
 
 ;(async () => {
-  await getRestaurantCodes()
+  // await getRestaurantCodes()
   await getRestaurantProducts()
 })()

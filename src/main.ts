@@ -72,7 +72,7 @@ const loadRestaurants = () => {
   cache.restaurantIds = []
   cache.restaurants = {}
 
-  readdirSync(join(__dirname, '../data'), { encoding: 'utf8' }).forEach(filename => {
+  readdirSync(join(__dirname, '../data'), 'utf8').forEach(filename => {
     if (filename.endsWith('.json')) {
       cache.restaurantIds.push(filename.replace('.json', ''))
     }
@@ -90,7 +90,7 @@ const getRandomProduct: () => {
     if (!cache.restaurants[restaurantId]) {
       try {
         cache.restaurants[restaurantId] = JSON.parse(
-          readFileSync(join(__dirname, `../data/${restaurantId}.json`), { encoding: 'utf8' }),
+          readFileSync(join(__dirname, `../data/${restaurantId}.json`), 'utf8'),
         )
       } catch {
         continue
