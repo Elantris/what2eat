@@ -115,10 +115,12 @@ const bannedWords: string[] = [
   '人份',
 ]
 
-const filterProductName: (productName: string) => string | null = productName => {
+const filterProductName: (productName: string) => string | null = (
+  productName,
+) => {
   const name = productName.replace(/[\x00-\x7F]/g, '').trim()
 
-  if (name.length < 2 || bannedWords.some(word => name.includes(word))) {
+  if (name.length < 2 || bannedWords.some((word) => name.includes(word))) {
     return null
   }
 

@@ -13,7 +13,7 @@ import {
   SlashCommandBuilder,
   TextChannel,
 } from 'discord.js'
-import admin, { ServiceAccount } from 'firebase-admin'
+import admin, { type ServiceAccount } from 'firebase-admin'
 import { readdirSync, readFileSync } from 'fs'
 import { DateTime } from 'luxon'
 import { join } from 'path'
@@ -22,13 +22,20 @@ import { CommandProps, ProductProps, RestaurantProps } from './types'
 
 // firebase
 admin.initializeApp({
-  credential: admin.credential.cert(config.FIREBASE.serviceAccount as ServiceAccount),
+  credential: admin.credential.cert(
+    config.FIREBASE.serviceAccount as ServiceAccount,
+  ),
   databaseURL: config.FIREBASE.databaseURL,
 })
 const database = admin.database()
 
-const timeFormatter: (options?: { time?: number | null; format?: string }) => string = options =>
-  DateTime.fromMillis(options?.time || Date.now()).toFormat(options?.format || 'yyyy-MM-dd HH:mm:ss')
+const timeFormatter: (options?: {
+  time?: number | null
+  format?: string
+}) => string = (options) =>
+  DateTime.fromMillis(options?.time || Date.now()).toFormat(
+    options?.format || 'yyyy-MM-dd HH:mm:ss',
+  )
 
 const cache: {
   [key: string]: any
@@ -38,16 +45,16 @@ const cache: {
     [ID in string]?: any
   }
   restaurantIds: string[]
-  restaurants: {
-    [RestaurantID in string]?: RestaurantProps
-  }
+  // restaurants: {
+  //   [RestaurantID in string]?: RestaurantProps
+  // }
   isCooling: { [ID: string]: number }
 } = {
   isReady: false,
   logChannel: null,
   banned: {},
   restaurantIds: [],
-  restaurants: {},
+  // restaurants: {},
   isCooling: {},
 }
 const updateCache = (snapshot: admin.database.DataSnapshot) => {
@@ -70,9 +77,9 @@ database.ref('/banned').on('child_removed', removeCache)
 const loadRestaurants = () => {
   cache.isReady = false
   cache.restaurantIds = []
-  cache.restaurants = {}
+  // cache.restaurants = {}
 
-  readdirSync(join(__dirname, '../data'), 'utf8').forEach(filename => {
+  readdirSync(join(__dirname, '../data'), 'utf8').forEach((filename) => {
     if (filename.endsWith('.json')) {
       cache.restaurantIds.push(filename.replace('.json', ''))
     }
@@ -86,27 +93,30 @@ const getRandomProduct: () => {
   product: ProductProps
 } | null = () => {
   for (let i = 0; i < 5; i++) {
-    const restaurantId = cache.restaurantIds[Math.floor(Math.random() * cache.restaurantIds.length)]
-    if (!cache.restaurants[restaurantId]) {
-      try {
-        cache.restaurants[restaurantId] = JSON.parse(
-          readFileSync(join(__dirname, `../data/${restaurantId}.json`), 'utf8'),
-        )
-      } catch {
+    const restaurantId =
+      cache.restaurantIds[
+        Math.floor(Math.random() * cache.restaurantIds.length)
+      ]
+
+    try {
+      const restaurant = JSON.parse(
+        readFileSync(join(__dirname, `../data/${restaurantId}.json`), 'utf8'),
+      )
+      if (!restaurant?.products.length) {
         continue
       }
-    }
 
-    const restaurant = cache.restaurants[restaurantId]
-    if (!restaurant?.products.length) {
+      const product =
+        restaurant.products[
+          Math.floor(Math.random() * restaurant.products.length)
+        ]
+
+      return {
+        restaurant,
+        product,
+      }
+    } catch {
       continue
-    }
-
-    const product = restaurant.products[Math.floor(Math.random() * restaurant.products.length)]
-
-    return {
-      restaurant,
-      product,
     }
   }
 
@@ -114,23 +124,30 @@ const getRandomProduct: () => {
 }
 
 // discord
-const rest = new REST({ version: '10' }).setToken(config.DISCORD.TOKEN)
 const commandBuilds = [
-  new SlashCommandBuilder().setName('what2eat').setDescription('隨機抽選餐點').setDMPermission(false).toJSON(),
-  new SlashCommandBuilder().setName('help').setDescription('查看說明文件與客服群組').setDMPermission(false).toJSON(),
+  new SlashCommandBuilder()
+    .setName('what2eat')
+    .setDescription('隨機抽選餐點')
+    .setDMPermission(false),
+  new SlashCommandBuilder()
+    .setName('help')
+    .setDescription('查看說明文件與客服群組')
+    .setDMPermission(false),
   new ContextMenuCommandBuilder()
     .setName('report')
     .setType(ApplicationCommandType.Message)
-    .setDMPermission(false)
-    .toJSON(),
+    .setDMPermission(false),
 ]
-rest.put(Routes.applicationCommands(config.DISCORD.CLIENT_ID), { body: commandBuilds })
+const rest = new REST({ version: '10' }).setToken(config.DISCORD.TOKEN)
+rest.put(Routes.applicationCommands(config.DISCORD.CLIENT_ID), {
+  body: commandBuilds.map((v) => v.toJSON()),
+})
 
 const client = new Client({
   intents: ['Guilds'],
 })
 
-client.on(Events.InteractionCreate, async interaction => {
+client.on(Events.InteractionCreate, async (interaction) => {
   if (
     !cache.isReady ||
     !interaction.inGuild() ||
@@ -141,7 +158,10 @@ client.on(Events.InteractionCreate, async interaction => {
     return
   }
 
-  if (!interaction.isChatInputCommand() && !interaction.isMessageContextMenuCommand()) {
+  if (
+    !interaction.isChatInputCommand() &&
+    !interaction.isMessageContextMenuCommand()
+  ) {
     return
   }
 
@@ -149,10 +169,10 @@ client.on(Events.InteractionCreate, async interaction => {
     interaction.commandName === 'help'
       ? await commandHelp(interaction)
       : interaction.commandName === 'what2eat'
-      ? await commandPick(interaction)
-      : interaction.commandName === 'report'
-      ? await commandReport(interaction)
-      : null
+        ? await commandPick(interaction)
+        : interaction.commandName === 'report'
+          ? await commandReport(interaction)
+          : null
 
   if (!commandResult) {
     return
@@ -176,22 +196,26 @@ client.on(Events.InteractionCreate, async interaction => {
 
 // commands
 
-const commandHelp: CommandProps = async interaction => {
+const commandHelp: CommandProps = async (interaction) => {
   return {
-    content: ':stew: What2Eat 吃什麼機器人！\n說明文件：<{MANUAL}>\n開發群組：{DISCORD}'
-      .replace('{MANUAL}', 'https://hackmd.io/@eelayntris/what2eat')
-      .replace('{DISCORD}', 'https://discord.gg/Ctwz4BB'),
+    content:
+      ':stew: What2Eat 吃什麼機器人！\n說明文件：<{MANUAL}>\n開發群組：{DISCORD}'
+        .replace('{MANUAL}', 'https://hackmd.io/@eelayntris/what2eat')
+        .replace('{DISCORD}', 'https://discord.gg/Ctwz4BB'),
   }
 }
 
-const commandPick: CommandProps = async interaction => {
+const commandPick: CommandProps = async (interaction) => {
   const guildId = interaction.guildId
   const member = interaction.guild?.members.cache.get(interaction.user.id)
   if (!guildId || !member) {
     return
   }
 
-  if (cache.isCooling[guildId] && interaction.user.id !== config.DISCORD.OWNER_ID) {
+  if (
+    cache.isCooling[guildId] &&
+    interaction.user.id !== config.DISCORD.OWNER_ID
+  ) {
     await interaction.reply({ content: ':ice_cube:', ephemeral: true })
     return
   }
@@ -228,10 +252,13 @@ const commandPick: CommandProps = async interaction => {
 `
         .replace('{PRODUCT_NAME}', escapeMarkdown(result.product.name))
         .replace('{STORE_NAME}', escapeMarkdown(result.restaurant.name))
-        .replace('{DESCRIPTION}', escapeMarkdown(result.product.description || ''))
+        .replace(
+          '{DESCRIPTION}',
+          escapeMarkdown(result.product.description || ''),
+        )
         .trim(),
       image: result.product.image ? { url: result.product.image } : undefined,
-      footer: { text: 'Version 2023-04-22' },
+      footer: { text: 'Version 2023-10-18' },
     },
     options: {
       restaurant: result.restaurant,
@@ -240,7 +267,7 @@ const commandPick: CommandProps = async interaction => {
   }
 }
 
-const commandReport: CommandProps = async interaction => {
+const commandReport: CommandProps = async (interaction) => {
   if (
     !interaction.isMessageContextMenuCommand() ||
     !interaction.inGuild() ||
@@ -249,7 +276,9 @@ const commandReport: CommandProps = async interaction => {
     return
   }
 
-  const data = (await database.ref(`/logs/${interaction.targetMessage.id}`).once('value')).val()
+  const data = (
+    await database.ref(`/logs/${interaction.targetMessage.id}`).once('value')
+  ).val()
   if (typeof data !== 'string') {
     return
   }
@@ -267,14 +296,14 @@ const commandReport: CommandProps = async interaction => {
 
   await logMessage.pin()
   return {
-    content: ':white_check_mark: 成功回報問題餐點：{RESTAURANT_NAME} {PRODUCT_NAME}'
-      .replace('{RESTAURANT_NAME}', restaurantName)
-      .replace('{PRODUCT_NAME}', productName),
+    content: ':white_check_mark: 已回報問題餐點',
   }
 }
 
 const sendLog: (options: {
-  interaction: ChatInputCommandInteraction | MessageContextMenuCommandInteraction
+  interaction:
+    | ChatInputCommandInteraction
+    | MessageContextMenuCommandInteraction
   command: string
   responseMessage: Message
   options?: {
@@ -282,11 +311,20 @@ const sendLog: (options: {
     product: ProductProps
   }
   error?: Error
-}) => Promise<void> = async ({ interaction, command, responseMessage, options, error }) => {
+}) => Promise<void> = async ({
+  interaction,
+  command,
+  responseMessage,
+  options,
+  error,
+}) => {
   const logMessage = await cache.logChannel
     ?.send({
       content: '[`{TIME}`] {COMMAND}\n{RESPONSE}'
-        .replace('{TIME}', timeFormatter({ time: interaction.createdTimestamp }))
+        .replace(
+          '{TIME}',
+          timeFormatter({ time: interaction.createdTimestamp }),
+        )
         .replace('{COMMAND}', command)
         .replace('{RESPONSE}', responseMessage.content),
       embeds: [
@@ -297,23 +335,29 @@ const sendLog: (options: {
 \`{GUILD_ID}\` {GUILD_NAME}
 \`{CHANNEL_ID}\` {CHANNEL_NAME}
 \`{USER_ID}\` {USER_TAG}
-{CACHED_COUNT}/{RESTAURANT_COUNT} {LINK}
+{LINK}
 `
             .replace('{GUILD_ID}', interaction.guildId || '--')
-            .replace('{GUILD_NAME}', escapeMarkdown(interaction.guild?.name || '--'))
+            .replace(
+              '{GUILD_NAME}',
+              escapeMarkdown(interaction.guild?.name || '--'),
+            )
             .replace('{CHANNEL_ID}', interaction.channelId)
             .replace(
               '{CHANNEL_NAME}',
               escapeMarkdown(
-                !interaction.inGuild() || !interaction.channel ? '--' : escapeMarkdown(interaction.channel.name),
+                !interaction.inGuild() || !interaction.channel
+                  ? '--'
+                  : escapeMarkdown(interaction.channel.name),
               ),
             )
             .replace('{USER_ID}', interaction.user.id)
             .replace('{USER_TAG}', escapeMarkdown(interaction.user.tag))
             .replace('{RESTAURANT_ID}', options?.restaurant?.id || '--')
-            .replace('{CACHED_COUNT}', `${Object.keys(cache.restaurants).length}`)
-            .replace('{RESTAURANT_COUNT}', `${cache.restaurantIds.length}`)
-            .replace('{LINK}', options?.restaurant ? `[Link](${options.restaurant.url})` : '')
+            .replace(
+              '{LINK}',
+              options?.restaurant ? `[Link](${options.restaurant.url})` : '',
+            )
             .trim(),
           fields: error
             ? [
@@ -323,7 +367,9 @@ const sendLog: (options: {
                 },
               ]
             : undefined,
-          footer: { text: `${responseMessage.createdTimestamp - interaction.createdTimestamp} ms` },
+          footer: {
+            text: `${responseMessage.createdTimestamp - interaction.createdTimestamp} ms`,
+          },
           timestamp: interaction.createdAt.toISOString(),
         },
       ],
@@ -331,13 +377,11 @@ const sendLog: (options: {
     .catch(() => {})
 
   if (interaction.commandName === 'what2eat' && logMessage && options) {
-    await database
-      .ref(`/logs/${responseMessage.id}`)
-      .set(`${logMessage.id};${options.restaurant.name};${options.product.name}`)
+    await database.ref(`/logs/${responseMessage.id}`).set(`${logMessage.id}`)
   }
 }
 
-client.on(Events.ClientReady, async client => {
+client.on(Events.ClientReady, async (client) => {
   const logChannel = client.channels.cache.get(config.DISCORD.LOGGER_CHANNEL_ID)
   if (logChannel?.type !== ChannelType.GuildText) {
     console.error('Log Channel Not Found')
@@ -349,7 +393,7 @@ client.on(Events.ClientReady, async client => {
   loadRestaurants()
 
   setInterval(() => {
-    client.user.setActivity(`on ${client.guilds.cache.size} guilds.`)
+    client.user.setActivity(`${client.guilds.cache.size}`)
   }, 10000)
 })
 

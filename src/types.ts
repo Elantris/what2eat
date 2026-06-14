@@ -1,4 +1,8 @@
-import { APIEmbed, ChatInputCommandInteraction, MessageContextMenuCommandInteraction } from 'discord.js'
+import {
+  APIEmbed,
+  ChatInputCommandInteraction,
+  MessageContextMenuCommandInteraction,
+} from 'discord.js'
 
 export type RestaurantProps = {
   id: string
@@ -15,7 +19,9 @@ export type ProductProps = {
 }
 
 export type CommandProps = (
-  interaction: ChatInputCommandInteraction | MessageContextMenuCommandInteraction,
+  interaction:
+    | ChatInputCommandInteraction
+    | MessageContextMenuCommandInteraction,
 ) => Promise<{
   content: string
   embed?: APIEmbed

@@ -1,28 +1,3 @@
 {
-  "typescript.tsdk": "node_modules/typescript/lib",
-  "cSpell.words": [
-    "arvz",
-    "changhua",
-    "chiayi",
-    "chromedriver",
-    "cooldown",
-    "csrf",
-    "foodpanda",
-    "hsinchu",
-    "hualien",
-    "innisfree",
-    "kinmen",
-    "luxon",
-    "miaoli",
-    "Millis",
-    "nantou",
-    "omedriver",
-    "penghu",
-    "pingtung",
-    "taitung",
-    "taoyuan",
-    "ubereats",
-    "yilan",
-    "yunlin"
-  ]
+  "typescript.tsdk": "node_modules/typescript/lib"
 }

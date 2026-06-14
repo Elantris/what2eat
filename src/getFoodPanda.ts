@@ -4,6 +4,17 @@ import { join } from 'path'
 import filterProductName from './filterProductName'
 import { RestaurantProps } from './types'
 
+// Be gentle to foodpanda's API: wait between every live network request.
+const REQUEST_DELAY_MS = 1000
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+// Perseus identifiers the foodpanda APIs require ("perseus headers are absent"
+// 400s if missing). These are stale-able; refresh from a browser session if the
+// crawler starts 4xx-ing.
+const perseusClientId = '1677518846092.793650064255124400.svmia69ahq'
+const perseusSessionId = '1697532353722.670325556598349400.hbusypp59a'
+
 const cityIds: {
   [CityName: string]: string
 } = {
@@ -32,7 +43,11 @@ const getRestaurantCodes = async () => {
   const restaurantCodes: string[] = []
 
   for (const cityName in cityIds) {
-    if (!existsSync(join(__dirname, `../raw/foodPanda/cityRequest/${cityName}.json`))) {
+    if (
+      !existsSync(
+        join(__dirname, `../raw/foodPanda/cityRequest/${cityName}.json`),
+      )
+    ) {
       const response = await axios({
         method: 'GET',
         url: 'https://disco.deliveryhero.io/listing/api/v1/pandora/vendors?language_id=6&vertical=restaurants&country=tw&include=characteristics&configuration=Variant1&offset=0&limit=&sort=&city_id={{CITY_ID}}'.replace(
@@ -43,12 +58,13 @@ const getRestaurantCodes = async () => {
         // credentials: 'omit',
         withCredentials: true,
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) Gecko/20100101 Firefox/118.0',
+          'User-Agent':
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) Gecko/20100101 Firefox/118.0',
           Accept: 'application/json, text/plain, */*',
           'Accept-Language': 'zh-TW,zh;q=0.8,en-US;q=0.5,en;q=0.3',
           'X-FP-API-KEY': 'volo',
-          'perseus-client-id': '1677518846092.793650064255124400.svmia69ahq',
-          'perseus-session-id': '1697532353722.670325556598349400.hbusypp59a',
+          'perseus-client-id': perseusClientId,
+          'perseus-session-id': perseusSessionId,
           'x-disco-client-id': 'web',
           'Sec-Fetch-Dest': 'empty',
           'Sec-Fetch-Mode': 'cors',
@@ -67,15 +83,26 @@ const getRestaurantCodes = async () => {
         JSON.stringify(response.data),
         'utf8',
       )
+
+      await sleep(REQUEST_DELAY_MS)
     }
 
-    const cityData = JSON.parse(readFileSync(join(__dirname, `../raw/foodPanda/cityRequest/${cityName}.json`), 'utf8'))
+    const cityData = JSON.parse(
+      readFileSync(
+        join(__dirname, `../raw/foodPanda/cityRequest/${cityName}.json`),
+        'utf8',
+      ),
+    )
 
     cityData.data.items.forEach((item: any) => {
       restaurantCodes.push(item.code)
     })
 
-    writeFileSync(join(__dirname, `../raw/foodPanda/restaurantCodes.json`), JSON.stringify(restaurantCodes), 'utf8')
+    writeFileSync(
+      join(__dirname, `../raw/foodPanda/restaurantCodes.json`),
+      JSON.stringify(restaurantCodes),
+      'utf8',
+    )
   }
 }
 
@@ -101,13 +128,31 @@ const excludeNames = new RegExp(
 
 const getRestaurantProducts = async () => {
   let i = 0
-  const restaurantCodes = JSON.parse(readFileSync(join(__dirname, `../raw/foodPanda/restaurantCodes.json`), 'utf8'))
+  const restaurantCodes = JSON.parse(
+    readFileSync(
+      join(__dirname, `../raw/foodPanda/restaurantCodes.json`),
+      'utf8',
+    ),
+  )
 
   for (const restaurantCode of restaurantCodes) {
     let restaurantFile: any = {}
-    if (existsSync(join(__dirname, `../raw/foodPanda/restaurantRequest/${restaurantCode}.json`))) {
+    if (
+      existsSync(
+        join(
+          __dirname,
+          `../raw/foodPanda/restaurantRequest/${restaurantCode}.json`,
+        ),
+      )
+    ) {
       restaurantFile = JSON.parse(
-        readFileSync(join(__dirname, `../raw/foodPanda/restaurantRequest/${restaurantCode}.json`), 'utf8'),
+        readFileSync(
+          join(
+            __dirname,
+            `../raw/foodPanda/restaurantRequest/${restaurantCode}.json`,
+          ),
+          'utf8',
+        ),
       )
     } else {
       try {
@@ -121,14 +166,14 @@ const getRestaurantProducts = async () => {
           // "credentials": "include",
           withCredentials: true,
           headers: {
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) Gecko/20100101 Firefox/110.0',
+            'User-Agent':
+              'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) Gecko/20100101 Firefox/110.0',
             Accept: 'application/json, text/plain, */*',
             'Accept-Language': 'zh-TW,zh;q=0.8,en-US;q=0.5,en;q=0.3',
             'X-FP-API-KEY': 'volo',
             'X-PD-Language-ID': '6',
-            'dps-session-id':
-              'eyJzZXNzaW9uX2lkIjoiOTc2MWM3ODg1ZGUwYzc0MWQzZGIxZTU1NmFkODkzMmQiLCJwZXJzZXVzX2lkIjoiMTY3NzUxODg0NjA5Mi43OTM2NTAwNjQyNTUxMjQ0MDAuc3ZtaWE2OWFocSIsInRpbWVzdGFtcCI6MTY3NzU3OTIzMn0=',
-            'Perseus-Session-ID': '1677518846092.793650064255124400.svmia69ahq',
+            'perseus-client-id': perseusClientId,
+            'perseus-session-id': perseusSessionId,
             'Api-Version': '6',
             'Sec-Fetch-Dest': 'empty',
             'Sec-Fetch-Mode': 'cors',
@@ -141,13 +186,20 @@ const getRestaurantProducts = async () => {
         })
 
         writeFileSync(
-          join(__dirname, `../raw/foodPanda/restaurantRequest/${restaurantCode}.json`),
+          join(
+            __dirname,
+            `../raw/foodPanda/restaurantRequest/${restaurantCode}.json`,
+          ),
           JSON.stringify(response.data),
           'utf8',
         )
         restaurantFile = response.data
+
+        await sleep(REQUEST_DELAY_MS)
       } catch {
         console.log(`error: ${restaurantCode}`)
+
+        await sleep(REQUEST_DELAY_MS)
         continue
       }
     }
@@ -195,6 +247,6 @@ const getRestaurantProducts = async () => {
 }
 
 ;(async () => {
-  // await getRestaurantCodes()
+  await getRestaurantCodes()
   await getRestaurantProducts()
 })()
